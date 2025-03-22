@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "142110682275",
+    "project_id": "mobile2bd",
+    "storage_bucket": "mobile2bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:142110682275:android:0f3258f5c13d018ceaa316",
+        "android_client_info": {
+          "package_name": "com.example.projetsameh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdGpk-hEtJvdJE1dC058Nmje43une5hiM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

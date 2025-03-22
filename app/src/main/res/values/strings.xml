@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gestion Cultures</string>
+    <string name="type_culture_icon">Icône type de culture</string>
+    <string name="ajouter_culture">Ajouter une culture</string>
+    <string name="modifier_culture">Modifier la culture</string>
+    <string name="conditions_actuelles">Conditions actuelles</string>
+    <string name="temperature_actuelle">Température : %.1f°C</string>
+    <string name="humidite_actuelle">Humidité : %.1f%%</string>
+    <string name="temperature_range">Température : %.1f°C - %.1f°C</string>
+    <string name="humidite_range">Humidité : %.1f%% - %.1f%%</string>
+    <string name="confirmation_suppression">Confirmation de suppression</string>
+    <string name="message_confirmation_suppression">Êtes-vous sûr de vouloir supprimer cette culture ?</string>
+    <string name="oui">Oui</string>
+    <string name="non">Non</string>
+    <string name="nom_culture">Nom de la culture</string>
+    <string name="type_culture">Type de culture</string>
+    <string name="temperature_min">Température minimale (°C)</string>
+    <string name="temperature_max">Température maximale (°C)</string>
+    <string name="humidite_min">Humidité minimale (%)</string>
+    <string name="humidite_max">Humidité maximale (%)</string>
+    <string name="commentaires">Commentaires</string>
+    <string name="enregistrer">Enregistrer</string>
+    <string name="annuler">Annuler</string>
+    <string name="erreur_champ_obligatoire">Ce champ est obligatoire</string>
+    <string name="erreur_temperature_invalide">La température doit être comprise entre -50°C et 50°C</string>
+    <string name="erreur_humidite_invalide">L\'humidité doit être comprise entre 0% et 100%</string>
+    <string name="erreur_gps">Impossible d\'obtenir la position GPS</string>
+    <string name="erreur_geocodage">Impossible d\'obtenir l\'adresse</string>
+</resources>
