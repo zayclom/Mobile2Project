@@ -8,6 +8,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.os.Bundle
+import android.os.Looper
+import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -21,6 +23,8 @@ import com.example.projetsameh.adapter.CultureAdapter
 import com.example.projetsameh.data.Culture
 import com.example.projetsameh.viewmodel.CultureViewModel
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.database.FirebaseDatabase
@@ -83,32 +87,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private fun initialiserCapteurs() {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         
+        // Initialisation des capteurs individuels
+        temperatureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE)
+        humiditySensor = sensorManager.getDefaultSensor(Sensor.TYPE_RELATIVE_HUMIDITY)
+        
         // Vérification des capteurs disponibles
         val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
-        val capteursDisponibles = sensors.map { it.type }.toSet()
-        
-        // Initialisation du capteur de température
-        temperatureSensor = if (capteursDisponibles.contains(Sensor.TYPE_AMBIENT_TEMPERATURE)) {
-            sensorManager.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE)
-        } else {
-            null
+        Log.d("Sensors", "Liste des capteurs disponibles :")
+        sensors.forEach { sensor ->
+            Log.d("Sensors", "Capteur : ${sensor.name} (Type: ${sensor.type})")
         }
         
-        // Initialisation du capteur d'humidité
-        humiditySensor = if (capteursDisponibles.contains(Sensor.TYPE_RELATIVE_HUMIDITY)) {
-            sensorManager.getDefaultSensor(Sensor.TYPE_RELATIVE_HUMIDITY)
-        } else {
-            null
-        }
-
-        // Affichage des messages si les capteurs ne sont pas disponibles
         if (temperatureSensor == null) {
             temperatureActuelle.text = "Température : Non disponible"
             Toast.makeText(this, "Capteur de température non disponible", Toast.LENGTH_LONG).show()
+        } else {
+            Log.d("Sensors", "Capteur de température trouvé : ${temperatureSensor?.name}")
+            Log.d("Sensors", "Résolution du capteur de température : ${temperatureSensor?.resolution}")
+            Log.d("Sensors", "Plage du capteur de température : ${temperatureSensor?.maximumRange}°C")
         }
         if (humiditySensor == null) {
             humiditeActuelle.text = "Humidité : Non disponible"
             Toast.makeText(this, "Capteur d'humidité non disponible", Toast.LENGTH_LONG).show()
+        } else {
+            Log.d("Sensors", "Capteur d'humidité trouvé : ${humiditySensor?.name}")
+            Log.d("Sensors", "Résolution du capteur d'humidité : ${humiditySensor?.resolution}")
+            Log.d("Sensors", "Plage du capteur d'humidité : ${humiditySensor?.maximumRange}%")
         }
     }
 
@@ -116,10 +120,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onResume()
         // Enregistrement des capteurs disponibles
         temperatureSensor?.let { 
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            val success = sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            Log.d("Sensors", "Enregistrement du capteur de température : ${if (success) "succès" else "échec"}")
         }
         humiditySensor?.let { 
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            val success = sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            Log.d("Sensors", "Enregistrement du capteur d'humidité : ${if (success) "succès" else "échec"}")
         }
     }
 
@@ -129,37 +135,54 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun verifierPermissions() {
-        val permissions = arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST_CODE
+            )
+        }
+    }
 
-        val permissionsToRequest = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }.toTypedArray()
+    private fun getLastLocation(onLocationReceived: (Location) -> Unit) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location: Location? ->
+                    location?.let {
+                        onLocationReceived(it)
+                    } ?: run {
+                        Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("Location", "Erreur lors de l'obtention de la position", e)
+                    Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
+                }
+        } else {
+            Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
+        }
+    }
 
-        if (permissionsToRequest.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissionsToRequest, PERMISSIONS_REQUEST_CODE)
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            LOCATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isEmpty() || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "Permission de localisation refusée", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
     private fun ajouterCulture() {
         CultureDialog(this) { culture ->
-            // Mise à jour de la position GPS
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                fusedLocationClient.lastLocation
-                    .addOnSuccessListener { location: Location? ->
-                        location?.let {
-                            culture.latitude = it.latitude
-                            culture.longitude = it.longitude
-                            // TODO: Implémenter le géocodage pour obtenir l'adresse
-                            viewModel.insertCulture(culture)
-                        } ?: run {
-                            Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
-                        }
-                    }
-            } else {
-                Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
+            getLastLocation { location ->
+                culture.latitude = location.latitude
+                culture.longitude = location.longitude
                 viewModel.insertCulture(culture)
             }
         }.show()
@@ -167,22 +190,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun modifierCulture(culture: Culture) {
         CultureDialog(this, culture) { updatedCulture ->
-            // Mise à jour de la position GPS
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                fusedLocationClient.lastLocation
-                    .addOnSuccessListener { location: Location? ->
-                        location?.let {
-                            updatedCulture.latitude = it.latitude
-                            updatedCulture.longitude = it.longitude
-                            // TODO: Implémenter le géocodage pour obtenir l'adresse
-                            viewModel.updateCulture(updatedCulture)
-                        } ?: run {
-                            Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
-                            viewModel.updateCulture(updatedCulture)
-                        }
-                    }
-            } else {
-                Toast.makeText(this, R.string.erreur_gps, Toast.LENGTH_LONG).show()
+            getLastLocation { location ->
+                updatedCulture.latitude = location.latitude
+                updatedCulture.longitude = location.longitude
                 viewModel.updateCulture(updatedCulture)
             }
         }.show()
@@ -201,20 +211,25 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent?) {
         event?.let {
+            Log.d("Sensors", "Valeurs reçues du capteur ${it.sensor.name} : ${it.values.joinToString()}")
             when (it.sensor.type) {
                 Sensor.TYPE_AMBIENT_TEMPERATURE -> {
                     val temperature = it.values[0]
-                    if (temperature in -50.0..50.0) { // Vérification de la plage valide
+                    Log.d("Sensors", "Température brute : $temperature")
+                    if (temperature in -100.0..100.0) {
                         temperatureActuelle.text = getString(R.string.temperature_actuelle, temperature)
                     } else {
+                        Log.e("Sensors", "Température hors plage : $temperature")
                         temperatureActuelle.text = "Température : Erreur de lecture"
                     }
                 }
                 Sensor.TYPE_RELATIVE_HUMIDITY -> {
                     val humidite = it.values[0]
-                    if (humidite in 0.0..100.0) { // Vérification de la plage valide
+                    Log.d("Sensors", "Humidité brute : $humidite")
+                    if (humidite in 0.0..100.0) {
                         humiditeActuelle.text = getString(R.string.humidite_actuelle, humidite)
                     } else {
+                        Log.e("Sensors", "Humidité hors plage : $humidite")
                         humiditeActuelle.text = "Humidité : Erreur de lecture"
                     }
                 }
@@ -228,5 +243,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     companion object {
         private const val PERMISSIONS_REQUEST_CODE = 100
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 101
     }
 }
