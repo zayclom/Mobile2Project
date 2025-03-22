@@ -1,29 +1,24 @@
 package com.example.projetsameh.data
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import java.util.Date
+import android.os.Parcelable
+import com.google.firebase.database.IgnoreExtraProperties
+import kotlinx.parcelize.Parcelize
 
-@Entity(tableName = "cultures")
+@Parcelize
+@IgnoreExtraProperties
 data class Culture(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    var nom: String,
-    var adresse: String,
-    var latitude: Double,
-    var longitude: Double,
-    var temperatureMin: Double,
-    var temperatureMax: Double,
-    var humiditeMin: Double,
-    var humiditeMax: Double,
-    val dateEnregistrement: Date,
-    var typeCulture: TypeCulture,
-    var commentaires: String? = null
-)
-
-enum class TypeCulture {
-    CEREALES,
-    LEGUMES,
-    FRUITS,
-    AUTRE
-} 
+    var id: String = "",
+    var nom: String = "",
+    var type: String = "",
+    var datePlantation: String = "",
+    var etat: String = "",
+    var besoins: String = "",
+    var latitude: Double = 0.0,
+    var longitude: Double = 0.0,
+    var adresse: String = "",
+    var temperatureMin: Double = 0.0,
+    var temperatureMax: Double = 0.0,
+    var humiditeMin: Double = 0.0,
+    var humiditeMax: Double = 0.0,
+    var commentaires: String = ""
+) : Parcelable 

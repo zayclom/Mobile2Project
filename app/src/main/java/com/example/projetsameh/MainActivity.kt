@@ -31,6 +31,8 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import java.text.DecimalFormat
+import android.location.Geocoder
+import java.util.*
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var viewModel: CultureViewModel
@@ -45,43 +47,83 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private val decimalFormat = DecimalFormat("#0.0")
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        try {
+            super.onCreate(savedInstanceState)
+            Log.e("MainActivity", "onCreate started")
+            setContentView(R.layout.activity_main)
 
-        // Initialisation des vues
-        temperatureActuelle = findViewById(R.id.temperatureActuelle)
-        humiditeActuelle = findViewById(R.id.humiditeActuelle)
+            // Initialisation des vues
+            try {
+                temperatureActuelle = findViewById(R.id.temperatureActuelle)
+                humiditeActuelle = findViewById(R.id.humiditeActuelle)
+                Log.e("MainActivity", "Views initialized")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing views", e)
+                throw e
+            }
 
-        // Initialisation du ViewModel
-        viewModel = ViewModelProvider(this)[CultureViewModel::class.java]
+            // Initialisation du ViewModel
+            try {
+                viewModel = ViewModelProvider(this)[CultureViewModel::class.java]
+                Log.e("MainActivity", "ViewModel initialized")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing ViewModel", e)
+                throw e
+            }
 
-        // Initialisation de la RecyclerView
-        val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewCultures)
-        adapter = CultureAdapter(
-            onItemClick = { culture -> modifierCulture(culture) },
-            onItemLongClick = { culture -> supprimerCulture(culture) }
-        )
-        recyclerView.adapter = adapter
-        recyclerView.layoutManager = LinearLayoutManager(this)
+            // Initialisation de la RecyclerView
+            try {
+                val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewCultures)
+                adapter = CultureAdapter(
+                    onItemClick = { culture -> modifierCulture(culture) },
+                    onItemLongClick = { culture -> supprimerCulture(culture) }
+                )
+                recyclerView.adapter = adapter
+                recyclerView.layoutManager = LinearLayoutManager(this)
+                Log.e("MainActivity", "RecyclerView initialized")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing RecyclerView", e)
+                throw e
+            }
 
-        // Observation des cultures
-        viewModel.allCultures.observe(this) { cultures ->
-            adapter.submitList(cultures)
+            // Observation des cultures
+            viewModel.allCultures.observe(this) { cultures ->
+                Log.e("MainActivity", "Received cultures from ViewModel: ${cultures.size}")
+                adapter.submitList(cultures)
+            }
+
+            // Initialisation des services de localisation
+            try {
+                fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+                Log.e("MainActivity", "Location services initialized")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing location services", e)
+                throw e
+            }
+
+            // Initialisation des capteurs
+            initialiserCapteurs()
+
+            // Configuration du FAB
+            try {
+                findViewById<FloatingActionButton>(R.id.fabAjouterCulture).setOnClickListener {
+                    Log.e("MainActivity", "FAB clicked")
+                    ajouterCulture()
+                }
+                Log.e("MainActivity", "FAB initialized")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing FAB", e)
+                throw e
+            }
+
+            // Vérification des permissions
+            verifierPermissions()
+            Log.e("MainActivity", "onCreate completed successfully")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Fatal error in onCreate", e)
+            Toast.makeText(this, "Error starting app: ${e.message}", Toast.LENGTH_LONG).show()
+            throw e // Re-throw to ensure the app crashes and we can see the error
         }
-
-        // Initialisation des services de localisation
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
-        // Initialisation des capteurs
-        initialiserCapteurs()
-
-        // Configuration du FAB
-        findViewById<FloatingActionButton>(R.id.fabAjouterCulture).setOnClickListener {
-            ajouterCulture()
-        }
-
-        // Vérification des permissions
-        verifierPermissions()
     }
 
     private fun initialiserCapteurs() {
@@ -178,24 +220,78 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    private fun ajouterCulture() {
-        CultureDialog(this) { culture ->
-            getLastLocation { location ->
-                culture.latitude = location.latitude
-                culture.longitude = location.longitude
-                viewModel.insertCulture(culture)
+    private fun getAddressFromLocation(latitude: Double, longitude: Double, onAddressReceived: (String) -> Unit) {
+        try {
+            val geocoder = Geocoder(this, Locale.getDefault())
+            val addresses = geocoder.getFromLocation(latitude, longitude, 1)
+            
+            if (addresses != null && addresses.isNotEmpty()) {
+                val address = addresses[0]
+                val addressText = buildString {
+                    // Rue
+                    address.getAddressLine(0)?.let { append(it) }
+                    // Ville
+                    address.locality?.let { append(", $it") }
+                    // Code postal
+                    address.postalCode?.let { append(" $it") }
+                    // Pays
+                    address.countryName?.let { append(", $it") }
+                }
+                onAddressReceived(addressText)
+            } else {
+                onAddressReceived("Adresse non disponible")
             }
-        }.show()
+        } catch (e: Exception) {
+            Log.e("Geocoding", "Erreur lors du géocodage", e)
+            onAddressReceived("Erreur de géocodage")
+        }
+    }
+
+    private fun ajouterCulture() {
+        Log.d("MainActivity", "Starting ajouterCulture")
+        getLastLocation { location ->
+            Log.d("MainActivity", "Location received: ${location.latitude}, ${location.longitude}")
+            val dialog = CultureDialog.newInstance(
+                culture = null,
+                onCultureSaved = { culture ->
+                    Log.d("MainActivity", "Culture saved callback received")
+                    culture.latitude = location.latitude
+                    culture.longitude = location.longitude
+                    getAddressFromLocation(location.latitude, location.longitude) { address ->
+                        Log.d("MainActivity", "Address received: $address")
+                        culture.adresse = address
+                        // Add current date
+                        val currentDate = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                            .format(java.util.Date())
+                        culture.datePlantation = currentDate
+                        culture.etat = "En cours"
+                        culture.besoins = "Normal"
+                        
+                        Log.d("MainActivity", "Inserting culture into Firebase: ${culture.nom}")
+                        // Insert into Firebase
+                        viewModel.insertCulture(culture)
+                        
+                        // Show success message
+                        Toast.makeText(this, "Culture ajoutée avec succès", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+            dialog.show(supportFragmentManager, "CultureDialog")
+        }
     }
 
     private fun modifierCulture(culture: Culture) {
-        CultureDialog(this, culture) { updatedCulture ->
-            getLastLocation { location ->
-                updatedCulture.latitude = location.latitude
-                updatedCulture.longitude = location.longitude
+        val dialog = CultureDialog.newInstance(
+            culture = culture,
+            onCultureSaved = { updatedCulture ->
+                // Update in Firebase
                 viewModel.updateCulture(updatedCulture)
+                
+                // Show success message
+                Toast.makeText(this, "Culture modifiée avec succès", Toast.LENGTH_SHORT).show()
             }
-        }.show()
+        )
+        dialog.show(supportFragmentManager, "CultureDialog")
     }
 
     private fun supprimerCulture(culture: Culture) {
@@ -220,7 +316,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         temperatureActuelle.text = getString(R.string.temperature_actuelle, temperature)
                     } else {
                         Log.e("Sensors", "Température hors plage : $temperature")
-                        temperatureActuelle.text = "Température : Erreur de lecture"
+                        temperatureActuelle.text = "Température : En attente de réponse"
                     }
                 }
                 Sensor.TYPE_RELATIVE_HUMIDITY -> {
@@ -230,7 +326,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         humiditeActuelle.text = getString(R.string.humidite_actuelle, humidite)
                     } else {
                         Log.e("Sensors", "Humidité hors plage : $humidite")
-                        humiditeActuelle.text = "Humidité : Erreur de lecture"
+                        humiditeActuelle.text = "Humidité : En attente de réponse"
                     }
                 }
             }

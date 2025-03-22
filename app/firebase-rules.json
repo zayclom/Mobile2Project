@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "cultures": {
+      ".read": true,
+      ".write": true
+    }
+  }
+} 

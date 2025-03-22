@@ -13,54 +13,80 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class FirebaseManager {
-    private val database: FirebaseDatabase = Firebase.database
+    private val database = FirebaseDatabase.getInstance()
     private val culturesRef = database.getReference("cultures")
 
-    suspend fun saveCulture(culture: Culture) {
-        culturesRef.child(culture.id.toString()).setValue(culture).await()
+    fun addCulture(culture: Culture, onSuccess: () -> Unit, onError: (Exception) -> Unit) {
+        val newCultureRef = culturesRef.push()
+        culture.id = newCultureRef.key ?: ""
+        newCultureRef.setValue(culture)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it) }
     }
 
-    suspend fun deleteCulture(cultureId: Long) {
-        culturesRef.child(cultureId.toString()).removeValue().await()
+    fun updateCulture(culture: Culture, onSuccess: () -> Unit, onError: (Exception) -> Unit) {
+        culturesRef.child(culture.id).setValue(culture)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it) }
     }
 
-    fun getCulturesFlow(): Flow<List<Culture>> = callbackFlow {
-        val listener = object : ValueEventListener {
+    fun deleteCulture(cultureId: String, onSuccess: () -> Unit, onError: (Exception) -> Unit) {
+        culturesRef.child(cultureId).removeValue()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it) }
+    }
+
+    fun getCulture(cultureId: String, onSuccess: (Culture?) -> Unit, onError: (Exception) -> Unit) {
+        culturesRef.child(cultureId).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val cultures = snapshot.children.mapNotNull { it.getValue(Culture::class.java) }
-                trySend(cultures)
+                val culture = snapshot.getValue(Culture::class.java)
+                culture?.id = snapshot.key ?: ""
+                onSuccess(culture)
             }
 
             override fun onCancelled(error: DatabaseError) {
-                // Gérer l'erreur si nécessaire
+                onError(error.toException())
             }
-        }
+        })
+    }
 
-        culturesRef.addValueEventListener(listener)
+    fun getAllCultures(onSuccess: (List<Culture>) -> Unit, onError: (Exception) -> Unit) {
+        culturesRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val cultures = mutableListOf<Culture>()
+                for (cultureSnapshot in snapshot.children) {
+                    cultureSnapshot.getValue(Culture::class.java)?.let { culture ->
+                        culture.id = cultureSnapshot.key ?: ""
+                        cultures.add(culture)
+                    }
+                }
+                onSuccess(cultures)
+            }
 
-        awaitClose {
-            culturesRef.removeEventListener(listener)
-        }
+            override fun onCancelled(error: DatabaseError) {
+                onError(error.toException())
+            }
+        })
     }
 
     suspend fun syncCultures(localCultures: List<Culture>) {
         val remoteSnapshot = culturesRef.get().await()
         val remoteCultures = remoteSnapshot.children.mapNotNull { it.getValue(Culture::class.java) }
 
-        // Mettre à jour les cultures locales avec les données distantes
+        // Update local cultures with remote data
         localCultures.forEach { localCulture ->
             val remoteCulture = remoteCultures.find { it.id == localCulture.id }
-            if (remoteCulture != null && remoteCulture.dateEnregistrement.after(localCulture.dateEnregistrement)) {
-                saveCulture(remoteCulture)
+            if (remoteCulture != null) {
+                updateCulture(remoteCulture, {}, {})
             } else {
-                saveCulture(localCulture)
+                updateCulture(localCulture, {}, {})
             }
         }
 
-        // Ajouter les nouvelles cultures distantes
+        // Add new remote cultures
         remoteCultures.forEach { remoteCulture ->
             if (!localCultures.any { it.id == remoteCulture.id }) {
-                saveCulture(remoteCulture)
+                updateCulture(remoteCulture, {}, {})
             }
         }
     }
