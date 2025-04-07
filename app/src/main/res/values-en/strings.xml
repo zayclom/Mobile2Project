@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Crop Manager</string>
+    <string name="type_culture_icon">Crop type icon</string>
+    <string name="ajouter_culture">Add a crop</string>
+    <string name="modifier_culture">Edit crop</string>
+    <string name="conditions_actuelles">Current conditions</string>
+    <string name="temperature_actuelle">Temperature: %.1f°C</string>
+    <string name="humidite_actuelle">Humidity: %.1f%%</string>
+    <string name="temperature_range">Temperature: %.1f°C - %.1f°C</string>
+    <string name="humidite_range">Humidity: %.1f%% - %.1f%%</string>
+    <string name="confirmation_suppression">Delete confirmation</string>
+    <string name="message_confirmation_suppression">Are you sure you want to delete this crop?</string>
+    <string name="oui">Yes</string>
+    <string name="non">No</string>
+    <string name="nom_culture">Crop name</string>
+    <string name="type_culture">Crop type</string>
+    <string name="temperature_min">Minimum temperature (°C)</string>
+    <string name="temperature_max">Maximum temperature (°C)</string>
+    <string name="humidite_min">Minimum humidity (%)</string>
+    <string name="humidite_max">Maximum humidity (%)</string>
+    <string name="commentaires">Comments</string>
+    <string name="enregistrer">Save</string>
+    <string name="annuler">Cancel</string>
+    <string name="erreur_champ_obligatoire">This field is required</string>
+    <string name="erreur_temperature_invalide">Temperature must be between -50°C and 50°C</string>
+    <string name="erreur_humidite_invalide">Humidity must be between 0% and 100%</string>
+    <string name="erreur_gps">Unable to get GPS location</string>
+    <string name="erreur_geocodage">Unable to get address</string>
+</resources>
